@@ -1,36 +1,82 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# SPEAK — AI Communication Coach
 
-## Getting Started
+SPEAK is a web-only laptop MVP that helps users speak with calm confidence. Users practice speaking, get live transcription, receive AI coaching feedback, and track communication metrics.
 
-First, run the development server:
+## Project Structure
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+```
+speak/
+├── frontend/          # Next.js web app (the product)
+│   └── src/
+│       ├── app/           # Pages: / (landing), /conversation (practice)
+│       ├── components/    # UI: Navbar, ConversationScreen, MetricsPanel, etc.
+│       ├── hooks/         # Speech recognition, microphone, scoring
+│       ├── lib/           # Pure logic: scoring.ts, coachResponses.ts
+│       ├── services/      # WebSocket client (stub)
+│       └── store/         # Zustand global state
+├── backend/           # FastAPI Python server (not yet connected)
+├── docs/              # Architecture, scoring, sprint log, product brief
+├── CLAUDE.md          # AI coding agent context
+├── AGENTS.md          # AI coding agent rules
+└── README.md          # This file
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Requirements
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- Node.js 18+ (for frontend)
+- Python 3.11+ (for backend, optional for current MVP)
+- Chrome browser (Web Speech API required)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Running the App
 
-## Learn More
+### Frontend (required)
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+cd frontend
+npm install       # first time only
+npm run dev
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Open [http://localhost:3000](http://localhost:3000) in Chrome.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### Backend (optional — not yet connected)
 
-## Deploy on Vercel
+```bash
+cd backend
+venv\Scripts\activate      # Windows
+# source venv/bin/activate  # macOS/Linux
+uvicorn main:app --reload
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+API available at [http://127.0.0.1:8000](http://127.0.0.1:8000).
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Using the App
+
+1. Navigate to `/conversation`
+2. Click the mic button to start a session
+3. Speak naturally — your words are transcribed live
+4. The AI coach responds with feedback after each turn
+5. Watch your metrics update in real time: confidence, tempo, clarity, fillers
+
+## Current Features
+
+- Live browser speech-to-text (Web Speech API, Chrome only)
+- Real-time transcript display
+- Rule-based coach response after each speaking turn
+- Communication metrics: confidence, tempo, clarity, filler word count
+
+## Not Yet Implemented
+
+- Server-side transcription (Deepgram)
+- AI voice output (ElevenLabs)
+- LLM coaching replies (OpenAI / Claude API)
+- User accounts, sessions, or progress history
+- Database or backend persistence
+- Mobile support (laptop web only)
+
+## Docs
+
+- [Product Brief](docs/PRODUCT_BRIEF.md)
+- [Technical Architecture](docs/TECHNICAL_ARCHITECTURE.md)
+- [Scoring Framework](docs/SCORING_FRAMEWORK.md)
+- [Sprint Log](docs/SPRINT_LOG.md)
