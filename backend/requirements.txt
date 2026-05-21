@@ -2,3 +2,5 @@ fastapi
 uvicorn
 python-socketio
 websockets
+openai
+python-dotenv
