@@ -62,7 +62,11 @@ export function loadSessions(): SessionRecord[] {
 }
 
 export function saveSession(record: Omit<SessionRecord, "id">): void {
-  const sessions = loadSessions();
-  sessions.push({ ...record, id: crypto.randomUUID() });
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
+  try {
+    const sessions = loadSessions();
+    sessions.push({ ...record, id: crypto.randomUUID() });
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
+  } catch {
+    // localStorage unavailable or quota exceeded — session not persisted
+  }
 }

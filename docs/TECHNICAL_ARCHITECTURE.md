@@ -1,5 +1,56 @@
 # SPEAK — Technical Architecture
 
+## Anonymous Local User System
+
+SPEAK has no authentication. Every browser that opens the app is treated as an anonymous user identified by a UUID stored in `localStorage`.
+
+### Anonymous User ID
+
+`frontend/src/lib/localUser.ts` manages the anonymous identity:
+
+- `getOrCreateAnonymousUserId()` — reads `speak_anonymous_user_id` from `localStorage`; generates and stores a new UUID if absent.
+- `getAnonymousUserId()` — reads the key without creating one (returns `null` if unset).
+
+The ID is generated once per browser profile and persists across refreshes. It is not tied to a real account.
+
+### Session and Attempt IDs
+
+`frontend/src/lib/sessionIds.ts` provides two ID generators:
+
+- `createSessionId()` — prefixed `sess_<uuid>`, generated when a scenario is selected.
+- `createAttemptId()` — prefixed `att_<uuid>`, reserved for future per-utterance tracking.
+
+`sessionId` is generated client-side at session start (not at save time), making it a stable idempotency key for future backend writes.
+
+### Session Records
+
+`frontend/src/lib/sessionHistory.ts` defines `SessionRecord`. Key fields stored in `localStorage` under `speak_session_history`:
+
+| Field | Source |
+|---|---|
+| `id` | Generated at save time (localStorage record key) |
+| `sessionId` | Generated when scenario selected (`createSessionId`) |
+| `userId` | Anonymous user ID from `localUser.ts` |
+| `createdAt` / `dateTime` | ISO timestamp at session end |
+| `overall`, `confidence`, `tempo`, `fillers`, `clarity` | Computed from `scoring.ts` |
+| `totalWords` | Word count across user transcript entries |
+| `scenarioId`, `scenarioTitle` | From selected scenario |
+| `transcriptPreview` | First 3 user utterances |
+
+### Attempt Records (type only — not yet persisted)
+
+`AttemptRecord` in `sessionHistory.ts` defines the intended shape for per-utterance tracking. Each attempt maps to one user speech turn: local metrics + AI analysis at that moment. No storage or retrieval is implemented yet — the type exists to make future work straightforward.
+
+### Migration Path to Real Auth + Database
+
+When user accounts are added:
+
+1. **Replace anonymous ID** — integrate an auth provider (Clerk, Supabase Auth, etc.). Replace `getOrCreateAnonymousUserId()` with the provider's `userId`. The `userId` field already exists on `SessionRecord` and `AttemptRecord` — no schema changes needed.
+2. **Migrate localStorage to backend** — add `POST /sessions` and `GET /sessions` endpoints. Replace `saveSession` / `loadSessions` with API calls. Use `sessionId` as a deduplication key to merge existing local sessions on first login.
+3. **Implement attempt tracking** — wire `createAttemptId()` into `useMicrophone.ts` (one per final transcript result). Add `saveAttempt(record: AttemptRecord)` backed by a database table. Enables per-turn analysis, retry comparisons, and longitudinal improvement tracking.
+
+---
+
 ## Current Architecture (Sprint 0)
 
 All logic runs in the browser. The backend exists but is not connected.

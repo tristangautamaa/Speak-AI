@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import TranscriptPanel from "./TranscriptPanel";
 import MetricsPanel from "./MetricsPanel";
 import AttemptComparisonCard, { verdict } from "./AttemptComparisonCard";
 import MicButton from "./MicButton";
 import ScenarioPicker from "./ScenarioPicker";
+import OnboardingGuide, { hasSeenOnboarding } from "./OnboardingGuide";
 import { useConversationStore } from "@/store/conversationStore";
 import { useScoring } from "@/hooks/useScoring";
 import { normalizeTempo, normalizeFillers } from "@/lib/scoring";
@@ -87,14 +88,13 @@ export default function ConversationScreen() {
   const { transcript, reset, addTranscriptEntry, selectedScenario, setSelectedScenario, setSessionId, setUserId } =
     useConversationStore();
 
-  // On mount: reset conversation state, set stable anonymous userId
+  const [showOnboarding, setShowOnboarding] = useState(() => !hasSeenOnboarding());
+
+  // On mount: reset all conversation state and restore stable anonymous userId
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
-    setSelectedScenario(null);
     reset();
     setUserId(getOrCreateAnonymousUserId());
-    useConversationStore.getState().setSessionReview(null);
-    useConversationStore.getState().setSessionReviewLoading(false);
   }, []);
 
   // When a scenario is selected: assign a new sessionId and seed the opening prompt
@@ -111,10 +111,24 @@ export default function ConversationScreen() {
 
   const hasSession = transcript.some((e) => e.speaker === "user");
 
-  if (!selectedScenario) {
+  if (showOnboarding) {
     return (
       <div className="flex h-screen overflow-hidden bg-[#080b12]">
+        <OnboardingGuide onStart={() => setShowOnboarding(false)} />
+      </div>
+    );
+  }
+
+  if (!selectedScenario) {
+    return (
+      <div className="flex h-screen overflow-hidden bg-[#080b12] relative">
         <ScenarioPicker />
+        <button
+          onClick={() => setShowOnboarding(true)}
+          className="absolute top-4 right-5 text-[11px] text-white/25 hover:text-white/50 transition-colors"
+        >
+          Show guide
+        </button>
       </div>
     );
   }
@@ -219,9 +233,17 @@ export default function ConversationScreen() {
       </div>
 
       {/* Right panel — Metrics */}
-      <div className="w-80 xl:w-96 shrink-0 overflow-y-auto px-5 py-6">
+      <div className="w-80 xl:w-96 shrink-0 overflow-y-auto px-5 py-6 flex flex-col">
         <MetricsPanel />
         <AttemptComparisonCard />
+        <div className="mt-auto pt-6">
+          <button
+            onClick={() => setShowOnboarding(true)}
+            className="text-[11px] text-white/20 hover:text-white/45 transition-colors"
+          >
+            Show guide
+          </button>
+        </div>
       </div>
     </div>
   );
