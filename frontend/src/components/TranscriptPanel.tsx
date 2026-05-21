@@ -1,34 +1,22 @@
 "use client";
 
 import { useConversationStore } from "@/store/conversationStore";
-import { useEffect, useRef } from "react";
-
-const PLACEHOLDER_TRANSCRIPT = [
-  {
-    id: "1",
-    speaker: "ai" as const,
-    text: "Hi, I'm your AI communication coach. Tell me about a situation where you'd like to improve your confidence.",
-    timestamp: Date.now() - 12000,
-  },
-  {
-    id: "2",
-    speaker: "user" as const,
-    text: "Um, I usually struggle with, uh, public speaking. Like presentations at work.",
-    timestamp: Date.now() - 8000,
-  },
-  {
-    id: "3",
-    speaker: "ai" as const,
-    text: "That's a great starting point. Let's work on that together. Try introducing yourself as if you're starting a presentation right now.",
-    timestamp: Date.now() - 4000,
-  },
-];
+import { useCallback, useEffect, useRef } from "react";
 
 export default function TranscriptPanel() {
-  const { transcript, status } = useConversationStore();
+  const { transcript, status, addRetryPrompt, coachResponseSource } = useConversationStore();
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  const entries = transcript.length > 0 ? transcript : PLACEHOLDER_TRANSCRIPT;
+  const entries = transcript;
+
+  // Only the last real AI entry with showRetry gets the button
+  const lastRetryId = [...transcript]
+    .reverse()
+    .find((e) => e.speaker === "ai" && e.showRetry)?.id ?? null;
+
+  const handleRetry = useCallback(() => {
+    addRetryPrompt();
+  }, [addRetryPrompt]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -40,6 +28,11 @@ export default function TranscriptPanel() {
         <h2 className="text-xs font-semibold uppercase tracking-widest text-white/30">
           Transcript
         </h2>
+        {process.env.NODE_ENV === "development" && coachResponseSource !== null && (
+          <span className="text-[10px] text-white/25 font-mono">
+            Coach: {coachResponseSource === "openai" ? "OpenAI" : "Local fallback"}
+          </span>
+        )}
         {status === "active" && (
           <span className="flex items-center gap-1.5 text-xs text-emerald-400">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" />
@@ -63,14 +56,24 @@ export default function TranscriptPanel() {
             >
               {entry.speaker === "ai" ? "AI" : "You"}
             </div>
-            <div
-              className={`max-w-[80%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${
-                entry.speaker === "ai"
-                  ? "bg-white/5 text-white/80 rounded-tl-sm"
-                  : "bg-indigo-500/15 text-white/90 rounded-tr-sm"
-              }`}
-            >
-              {entry.text}
+            <div className="flex flex-col gap-2 max-w-[80%]">
+              <div
+                className={`px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${
+                  entry.speaker === "ai"
+                    ? "bg-white/5 text-white/80 rounded-tl-sm"
+                    : "bg-indigo-500/15 text-white/90 rounded-tr-sm"
+                }`}
+              >
+                {entry.text}
+              </div>
+              {entry.id === lastRetryId && (
+                <button
+                  onClick={handleRetry}
+                  className="self-start px-3 py-1.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-300/70 text-xs font-medium hover:bg-indigo-500/20 hover:text-indigo-300 transition-colors"
+                >
+                  Try again
+                </button>
+              )}
             </div>
           </div>
         ))}

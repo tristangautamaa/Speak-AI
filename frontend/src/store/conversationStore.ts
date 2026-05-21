@@ -3,6 +3,7 @@ import { create } from "zustand";
 type ConversationStatus = "idle" | "connecting" | "active" | "paused";
 export type MicStatus = "off" | "requesting" | "listening" | "error" | "paused";
 export type SocketStatus = "disconnected" | "connecting" | "connected";
+export type CoachResponseSource = "openai" | "fallback" | null;
 
 interface Metrics {
   confidence: number;
@@ -16,6 +17,7 @@ interface TranscriptEntry {
   speaker: "user" | "ai";
   text: string;
   timestamp: number;
+  showRetry?: boolean;
 }
 
 interface ConversationState {
@@ -29,17 +31,20 @@ interface ConversationState {
 
   socketStatus: SocketStatus;
   backendActive: boolean;
+  coachResponseSource: CoachResponseSource;
 
   setStatus: (status: ConversationStatus) => void;
   toggleMute: () => void;
   setMetrics: (metrics: Partial<Metrics>) => void;
   addTranscriptEntry: (entry: Omit<TranscriptEntry, "id">) => void;
+  addRetryPrompt: () => void;
 
   setMicStatus: (status: MicStatus) => void;
   setMicError: (error: string | null) => void;
 
   setSocketStatus: (status: SocketStatus) => void;
   setBackendActive: (active: boolean) => void;
+  setCoachResponseSource: (source: CoachResponseSource) => void;
 
   reset: () => void;
 }
@@ -62,6 +67,7 @@ export const useConversationStore = create<ConversationState>((set) => ({
 
   socketStatus: "disconnected",
   backendActive: false,
+  coachResponseSource: null,
 
   setStatus: (status) => set({ status }),
   toggleMute: () => set((state) => ({ isMuted: !state.isMuted })),
@@ -74,12 +80,25 @@ export const useConversationStore = create<ConversationState>((set) => ({
         { ...entry, id: crypto.randomUUID() },
       ],
     })),
+  addRetryPrompt: () =>
+    set((state) => ({
+      transcript: [
+        ...state.transcript,
+        {
+          id: crypto.randomUUID(),
+          speaker: "ai",
+          text: "Great. Say the same idea again, but slower and with fewer filler words.",
+          timestamp: Date.now(),
+        },
+      ],
+    })),
 
   setMicStatus: (micStatus) => set({ micStatus }),
   setMicError: (micError) => set({ micError }),
 
   setSocketStatus: (socketStatus) => set({ socketStatus }),
   setBackendActive: (backendActive) => set({ backendActive }),
+  setCoachResponseSource: (coachResponseSource) => set({ coachResponseSource }),
 
   reset: () =>
     set({
@@ -91,5 +110,6 @@ export const useConversationStore = create<ConversationState>((set) => ({
       micError: null,
       socketStatus: "disconnected",
       backendActive: false,
+      coachResponseSource: null,
     }),
 }));

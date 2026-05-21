@@ -3,7 +3,8 @@
 import { useRef, useCallback, useEffect } from "react";
 import { useConversationStore } from "@/store/conversationStore";
 import { useSpeechRecognition } from "./useSpeechRecognition";
-import { generateCoachResponse } from "@/lib/coachResponses";
+import { generateCoachResponse, shouldShowRetry } from "@/lib/coachResponses";
+import { requestCoachResponse } from "@/services/coachApi";
 
 export function useMicrophone() {
   const {
@@ -12,28 +13,45 @@ export function useMicrophone() {
     setMicError,
     setStatus,
     addTranscriptEntry,
+    setCoachResponseSource,
+    metrics,
   } = useConversationStore();
 
   // Buffer interim results so we only commit final transcripts
   const interimBufferRef = useRef<string>("");
+  // Ref keeps latest metrics accessible in the callback without causing re-creation
+  const metricsRef = useRef(metrics);
+  useEffect(() => { metricsRef.current = metrics; }, [metrics]);
 
   const handleResult = useCallback(
-    (text: string, isFinal: boolean) => {
+    async (text: string, isFinal: boolean) => {
       if (isFinal) {
         interimBufferRef.current = "";
         addTranscriptEntry({ speaker: "user", text, timestamp: Date.now() });
-        setTimeout(() => {
+        try {
+          const result = await requestCoachResponse(text, metricsRef.current);
+          setCoachResponseSource("openai");
+          addTranscriptEntry({
+            speaker: "ai",
+            text: result.coachResponse,
+            timestamp: Date.now(),
+            showRetry: result.practiceAgain,
+          });
+        } catch {
+          // Backend unavailable — fall back to local rule-based response
+          setCoachResponseSource("fallback");
           addTranscriptEntry({
             speaker: "ai",
             text: generateCoachResponse(text),
             timestamp: Date.now(),
+            showRetry: shouldShowRetry(text),
           });
-        }, 700);
+        }
       } else {
         interimBufferRef.current = text;
       }
     },
-    [addTranscriptEntry],
+    [addTranscriptEntry, setCoachResponseSource],
   );
 
   const handleError = useCallback(

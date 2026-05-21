@@ -121,7 +121,7 @@ export default function MetricsPanel() {
       label: "Fillers",
       displayValue: String(metrics.fillers),
       progressPct: fillerPct,
-      description: 'Filler words detected: "uh", "um", "like", "kind of", "maybe". Lower is better.',
+      description: "Detected filler or hesitation words like 'uh', 'um', 'like', 'maybe', 'kind of'. Lower is better.",
       color: metrics.fillers === 0 ? "text-emerald-400" : metrics.fillers < 4 ? "text-amber-400" : "text-red-400",
       bgColor: "bg-amber-500/10",
       barColor: metrics.fillers === 0 ? "bg-emerald-500/60" : metrics.fillers < 4 ? "bg-amber-500/60" : "bg-red-500/60",

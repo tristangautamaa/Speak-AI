@@ -12,9 +12,9 @@ speak/
 │       ├── components/    # UI: Navbar, ConversationScreen, MetricsPanel, etc.
 │       ├── hooks/         # Speech recognition, microphone, scoring
 │       ├── lib/           # Pure logic: scoring.ts, coachResponses.ts
-│       ├── services/      # WebSocket client (stub)
+│       ├── services/      # coachApi.ts (backend), socket.ts (stub)
 │       └── store/         # Zustand global state
-├── backend/           # FastAPI Python server (not yet connected)
+├── backend/           # FastAPI Python server
 ├── docs/              # Architecture, scoring, sprint log, product brief
 ├── CLAUDE.md          # AI coding agent context
 ├── AGENTS.md          # AI coding agent rules
@@ -24,12 +24,41 @@ speak/
 ## Requirements
 
 - Node.js 18+ (for frontend)
-- Python 3.11+ (for backend, optional for current MVP)
+- Python 3.11+ (for backend)
 - Chrome browser (Web Speech API required)
+- OpenAI API key
+
+## Setup
+
+### Backend environment
+
+```bash
+cd backend
+copy .env.example .env        # Windows
+# cp .env.example .env         # macOS/Linux
+```
+
+Open `backend/.env` and replace `your_api_key_here` with your actual OpenAI API key:
+
+```
+OPENAI_API_KEY=sk-...
+```
 
 ## Running the App
 
-### Frontend (required)
+### Backend (required for AI coaching)
+
+```bash
+cd backend
+venv\Scripts\activate          # Windows
+# source venv/bin/activate      # macOS/Linux
+pip install -r requirements.txt
+uvicorn main:app --reload
+```
+
+API available at [http://127.0.0.1:8000](http://127.0.0.1:8000).
+
+### Frontend
 
 ```bash
 cd frontend
@@ -39,37 +68,28 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000) in Chrome.
 
-### Backend (optional — not yet connected)
-
-```bash
-cd backend
-venv\Scripts\activate      # Windows
-# source venv/bin/activate  # macOS/Linux
-uvicorn main:app --reload
-```
-
-API available at [http://127.0.0.1:8000](http://127.0.0.1:8000).
+> **Note:** The frontend falls back to local rule-based coach replies if the backend is unreachable.
 
 ## Using the App
 
 1. Navigate to `/conversation`
 2. Click the mic button to start a session
 3. Speak naturally — your words are transcribed live
-4. The AI coach responds with feedback after each turn
+4. Aria (the AI coach) responds with feedback after each turn
 5. Watch your metrics update in real time: confidence, tempo, clarity, fillers
 
 ## Current Features
 
 - Live browser speech-to-text (Web Speech API, Chrome only)
 - Real-time transcript display
-- Rule-based coach response after each speaking turn
+- AI coaching replies via OpenAI (with local rule-based fallback)
 - Communication metrics: confidence, tempo, clarity, filler word count
+- Session summary with overall score, strengths, and suggested exercises
 
 ## Not Yet Implemented
 
 - Server-side transcription (Deepgram)
 - AI voice output (ElevenLabs)
-- LLM coaching replies (OpenAI / Claude API)
 - User accounts, sessions, or progress history
 - Database or backend persistence
 - Mobile support (laptop web only)

@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import TranscriptPanel from "./TranscriptPanel";
 import MetricsPanel from "./MetricsPanel";
 import MicButton from "./MicButton";
@@ -74,6 +76,19 @@ function AIAvatar() {
 
 export default function ConversationScreen() {
   useScoring();
+  const router = useRouter();
+  const { transcript, reset, addTranscriptEntry } = useConversationStore();
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    reset();
+    addTranscriptEntry({
+      speaker: "ai",
+      text: "Hi, I'm your AI communication coach. Tell me about a situation where you'd like to improve your confidence.",
+      timestamp: Date.now(),
+    });
+  }, []);
+  const hasSession = transcript.some((e) => e.speaker === "user");
 
   return (
     <div className="flex h-screen overflow-hidden bg-[#080b12]">
@@ -91,9 +106,17 @@ export default function ConversationScreen() {
           <TranscriptPanel />
         </div>
 
-        {/* Mic button */}
-        <div className="flex items-center justify-center py-8 border-t border-white/[0.05] bg-gradient-to-t from-black/40 to-transparent">
+        {/* Mic button + End Session */}
+        <div className="flex items-center justify-center gap-5 py-8 border-t border-white/[0.05] bg-gradient-to-t from-black/40 to-transparent">
           <MicButton size="lg" />
+          {hasSession && (
+            <button
+              onClick={() => router.push("/summary")}
+              className="px-4 py-2 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white/40 text-xs font-medium hover:bg-white/[0.07] hover:text-white/60 transition-colors"
+            >
+              End Session
+            </button>
+          )}
         </div>
       </div>
 
