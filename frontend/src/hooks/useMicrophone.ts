@@ -5,6 +5,7 @@ import { useConversationStore } from "@/store/conversationStore";
 import { useSpeechRecognition } from "./useSpeechRecognition";
 import { generateCoachResponse, shouldShowRetry } from "@/lib/coachResponses";
 import { requestCoachResponse } from "@/services/coachApi";
+import { countFillers } from "@/lib/scoring";
 
 export function useMicrophone() {
   const {
@@ -14,32 +15,76 @@ export function useMicrophone() {
     setStatus,
     addTranscriptEntry,
     setCoachResponseSource,
+    setLatestAiAnalysis,
+    setPendingRetryOriginalAttempt,
+    setLatestAttemptComparison,
     metrics,
+    selectedScenario,
   } = useConversationStore();
 
   // Buffer interim results so we only commit final transcripts
   const interimBufferRef = useRef<string>("");
-  // Ref keeps latest metrics accessible in the callback without causing re-creation
+  // Refs keep latest values accessible in callbacks without causing re-creation
   const metricsRef = useRef(metrics);
   useEffect(() => { metricsRef.current = metrics; }, [metrics]);
+  const scenarioRef = useRef(selectedScenario);
+  useEffect(() => { scenarioRef.current = selectedScenario; }, [selectedScenario]);
 
   const handleResult = useCallback(
     async (text: string, isFinal: boolean) => {
       if (isFinal) {
         interimBufferRef.current = "";
+        const pendingSnapshot = useConversationStore.getState().pendingRetryOriginalAttempt;
         addTranscriptEntry({ speaker: "user", text, timestamp: Date.now() });
         try {
-          const result = await requestCoachResponse(text, metricsRef.current);
+          const sc = scenarioRef.current;
+          const scenarioContext = sc
+            ? { scenarioId: sc.id, persona: sc.persona, coachingFocus: sc.coachingFocus, tone: sc.tone }
+            : undefined;
+          const result = await requestCoachResponse(text, metricsRef.current, scenarioContext);
           setCoachResponseSource("openai");
+          setLatestAiAnalysis(
+            result.aiScores ?? null,
+            result.detectedIssues ?? [],
+            result.rewriteSuggestion ?? null,
+          );
+          if (pendingSnapshot) {
+            setPendingRetryOriginalAttempt(null);
+            setLatestAttemptComparison({
+              original: pendingSnapshot,
+              retry: {
+                transcriptText: text,
+                fillerCount: countFillers(text),
+                wordCount: text.split(/\s+/).filter(Boolean).length,
+                aiScores: result.aiScores ?? null,
+              },
+            });
+          }
+          const displayText = result.nextPrompt
+            ? `${result.coachResponse}\n${result.nextPrompt}`
+            : result.coachResponse;
           addTranscriptEntry({
             speaker: "ai",
-            text: result.coachResponse,
+            text: displayText,
             timestamp: Date.now(),
             showRetry: result.practiceAgain,
           });
         } catch {
           // Backend unavailable — fall back to local rule-based response
           setCoachResponseSource("fallback");
+          setLatestAiAnalysis(null, [], null);
+          if (pendingSnapshot) {
+            setPendingRetryOriginalAttempt(null);
+            setLatestAttemptComparison({
+              original: pendingSnapshot,
+              retry: {
+                transcriptText: text,
+                fillerCount: countFillers(text),
+                wordCount: text.split(/\s+/).filter(Boolean).length,
+                aiScores: null,
+              },
+            });
+          }
           addTranscriptEntry({
             speaker: "ai",
             text: generateCoachResponse(text),
@@ -51,7 +96,7 @@ export function useMicrophone() {
         interimBufferRef.current = text;
       }
     },
-    [addTranscriptEntry, setCoachResponseSource],
+    [addTranscriptEntry, setCoachResponseSource, setLatestAiAnalysis, setPendingRetryOriginalAttempt, setLatestAttemptComparison],
   );
 
   const handleError = useCallback(

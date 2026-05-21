@@ -4,9 +4,16 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import TranscriptPanel from "./TranscriptPanel";
 import MetricsPanel from "./MetricsPanel";
+import AttemptComparisonCard, { verdict } from "./AttemptComparisonCard";
 import MicButton from "./MicButton";
+import ScenarioPicker from "./ScenarioPicker";
 import { useConversationStore } from "@/store/conversationStore";
 import { useScoring } from "@/hooks/useScoring";
+import { normalizeTempo, normalizeFillers } from "@/lib/scoring";
+import { saveSession } from "@/lib/sessionHistory";
+import { getOrCreateAnonymousUserId } from "@/lib/localUser";
+import { createSessionId } from "@/lib/sessionIds";
+import { requestSessionReview } from "@/services/sessionReviewApi";
 
 function StatusBar() {
   const { micStatus } = useConversationStore();
@@ -77,18 +84,40 @@ function AIAvatar() {
 export default function ConversationScreen() {
   useScoring();
   const router = useRouter();
-  const { transcript, reset, addTranscriptEntry } = useConversationStore();
+  const { transcript, reset, addTranscriptEntry, selectedScenario, setSelectedScenario, setSessionId, setUserId } =
+    useConversationStore();
 
+  // On mount: reset conversation state, set stable anonymous userId
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
+    setSelectedScenario(null);
     reset();
+    setUserId(getOrCreateAnonymousUserId());
+    useConversationStore.getState().setSessionReview(null);
+    useConversationStore.getState().setSessionReviewLoading(false);
+  }, []);
+
+  // When a scenario is selected: assign a new sessionId and seed the opening prompt
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!selectedScenario) return;
+    setSessionId(createSessionId());
     addTranscriptEntry({
       speaker: "ai",
-      text: "Hi, I'm your AI communication coach. Tell me about a situation where you'd like to improve your confidence.",
+      text: selectedScenario.openingPrompt,
       timestamp: Date.now(),
     });
-  }, []);
+  }, [selectedScenario]);
+
   const hasSession = transcript.some((e) => e.speaker === "user");
+
+  if (!selectedScenario) {
+    return (
+      <div className="flex h-screen overflow-hidden bg-[#080b12]">
+        <ScenarioPicker />
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen overflow-hidden bg-[#080b12]">
@@ -111,7 +140,76 @@ export default function ConversationScreen() {
           <MicButton size="lg" />
           {hasSession && (
             <button
-              onClick={() => router.push("/summary")}
+              onClick={() => {
+                const { metrics, transcript, selectedScenario: sc, sessionId, userId, latestAttemptComparison } =
+                  useConversationStore.getState();
+                const userEntries = transcript.filter((e) => e.speaker === "user");
+                const totalWords = userEntries
+                  .flatMap((e) => e.text.split(/\s+/).filter(Boolean))
+                  .length;
+                const tempoPct = normalizeTempo(metrics.tempo);
+                const fillerPct = normalizeFillers(metrics.fillers);
+                const overall = Math.round(
+                  (metrics.confidence + tempoPct + fillerPct + metrics.clarity) / 4,
+                );
+
+                const now = new Date().toISOString();
+                saveSession({
+                  sessionId: sessionId ?? undefined,
+                  userId: userId ?? undefined,
+                  createdAt: now,
+                  dateTime: now,
+                  overall,
+                  confidence: Math.round(metrics.confidence),
+                  tempo: metrics.tempo,
+                  fillers: metrics.fillers,
+                  clarity: Math.round(metrics.clarity),
+                  totalWords,
+                  scenarioId: sc?.id,
+                  scenarioTitle: sc?.title,
+                  transcriptPreview: transcript
+                    .filter((e) => e.speaker === "user")
+                    .slice(0, 3)
+                    .map((e) => e.text),
+                  attemptComparisonSummary: latestAttemptComparison
+                    ? {
+                        originalText: latestAttemptComparison.original.transcriptText,
+                        retryText: latestAttemptComparison.retry.transcriptText,
+                        fillerBefore: latestAttemptComparison.original.fillerCount,
+                        fillerAfter: latestAttemptComparison.retry.fillerCount,
+                        wordCountBefore: latestAttemptComparison.original.wordCount,
+                        wordCountAfter: latestAttemptComparison.retry.wordCount,
+                        aiConfidenceBefore: latestAttemptComparison.original.aiScores?.confidence ?? null,
+                        aiConfidenceAfter: latestAttemptComparison.retry.aiScores?.confidence ?? null,
+                        verdict: verdict(latestAttemptComparison),
+                      }
+                    : undefined,
+                });
+
+                // Fire session review — non-blocking, summary page handles loading state
+                useConversationStore.getState().setSessionReview(null);
+                useConversationStore.getState().setSessionReviewLoading(true);
+                requestSessionReview({
+                  scenarioTitle: sc?.title ?? null,
+                  transcript: transcript.map((e) => ({ speaker: e.speaker, text: e.text })),
+                  metrics: {
+                    confidence: Math.round(metrics.confidence),
+                    tempo: metrics.tempo,
+                    fillers: metrics.fillers,
+                    clarity: Math.round(metrics.clarity),
+                    totalWords,
+                  },
+                })
+                  .then((review) => {
+                    useConversationStore.getState().setSessionReview(review);
+                    useConversationStore.getState().setSessionReviewLoading(false);
+                  })
+                  .catch(() => {
+                    useConversationStore.getState().setSessionReviewLoading(false);
+                  });
+
+                router.push("/summary");
+              }}
               className="px-4 py-2 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white/40 text-xs font-medium hover:bg-white/[0.07] hover:text-white/60 transition-colors"
             >
               End Session
@@ -123,6 +221,7 @@ export default function ConversationScreen() {
       {/* Right panel — Metrics */}
       <div className="w-80 xl:w-96 shrink-0 overflow-y-auto px-5 py-6">
         <MetricsPanel />
+        <AttemptComparisonCard />
       </div>
     </div>
   );

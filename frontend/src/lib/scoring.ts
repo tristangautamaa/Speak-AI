@@ -70,3 +70,12 @@ export function normalizeFillers(count: number): number {
   // 0 fillers → 100 (full bar, good), 10+ → 0
   return Math.max(0, 100 - count * 10);
 }
+
+export function countFillers(text: string): number {
+  let count = 0;
+  for (const pattern of FILLER_PATTERNS) {
+    const matches = text.match(pattern);
+    if (matches) count += matches.length;
+  }
+  return count;
+}

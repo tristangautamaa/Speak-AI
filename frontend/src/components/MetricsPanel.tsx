@@ -75,6 +75,81 @@ function trendFor(value: number, thresholds: [number, number]): "good" | "warn" 
   return "bad";
 }
 
+function AiAnalysisPanel() {
+  const { latestAiScores, latestDetectedIssues, latestRewriteSuggestion } = useConversationStore();
+
+  const hasContent =
+    latestAiScores !== null ||
+    latestDetectedIssues.length > 0 ||
+    latestRewriteSuggestion !== null;
+
+  if (!hasContent) return null;
+
+  return (
+    <div className="mt-4">
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-xs font-semibold uppercase tracking-widest text-white/20">
+          AI Analysis
+        </h2>
+        <span className="text-[10px] text-white/20 font-mono">last response</span>
+      </div>
+      <div className="bg-white/[0.02] border border-white/[0.05] rounded-2xl p-4 flex flex-col gap-3">
+        {latestAiScores && (
+          <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
+            {(
+              [
+                { label: "Confidence", value: latestAiScores.confidence },
+                { label: "Clarity", value: latestAiScores.clarity },
+                { label: "Conciseness", value: latestAiScores.conciseness },
+                { label: "Presence", value: latestAiScores.presence },
+              ] as const
+            ).map(({ label, value }) => (
+              <div key={label} className="flex flex-col gap-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] text-white/35">{label}</span>
+                  <span className="text-[11px] font-medium tabular-nums text-white/50">
+                    {Math.round(value)}
+                  </span>
+                </div>
+                <div className="h-0.5 bg-white/[0.06] rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-indigo-400/40 rounded-full transition-all duration-500"
+                    style={{ width: `${value}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {latestDetectedIssues.length > 0 && (
+          <div className="flex flex-col gap-1 pt-2 border-t border-white/[0.04]">
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-white/20 mb-0.5">
+              Issues
+            </span>
+            {latestDetectedIssues.map((issue, i) => (
+              <p key={i} className="text-[11px] text-white/40 leading-relaxed">
+                · {issue}
+              </p>
+            ))}
+          </div>
+        )}
+
+        {latestRewriteSuggestion && (
+          <div className="flex flex-col gap-1 pt-2 border-t border-white/[0.04]">
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-white/20 mb-0.5">
+              Rewrite
+            </span>
+            <p className="text-[11px] text-white/50 leading-relaxed italic">
+              {latestRewriteSuggestion}
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function MetricsPanel() {
   const { metrics, status } = useConversationStore();
   const isActive = status === "active";
@@ -175,6 +250,8 @@ export default function MetricsPanel() {
           <MetricCard key={card.label} {...card} />
         ))}
       </div>
+
+      <AiAnalysisPanel />
     </div>
   );
 }

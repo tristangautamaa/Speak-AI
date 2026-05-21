@@ -1,13 +1,12 @@
 "use client";
 
 import { useConversationStore } from "@/store/conversationStore";
+import { countFillers } from "@/lib/scoring";
 import { useCallback, useEffect, useRef } from "react";
 
 export default function TranscriptPanel() {
-  const { transcript, status, addRetryPrompt, coachResponseSource } = useConversationStore();
+  const { transcript, status, addRetryPrompt, coachResponseSource, setPendingRetryOriginalAttempt } = useConversationStore();
   const bottomRef = useRef<HTMLDivElement>(null);
-
-  const entries = transcript;
 
   // Only the last real AI entry with showRetry gets the button
   const lastRetryId = [...transcript]
@@ -15,12 +14,23 @@ export default function TranscriptPanel() {
     .find((e) => e.speaker === "ai" && e.showRetry)?.id ?? null;
 
   const handleRetry = useCallback(() => {
+    const { transcript: tx, latestAiScores } = useConversationStore.getState();
+    const lastUserEntry = [...tx].reverse().find((e) => e.speaker === "user");
+    if (lastUserEntry) {
+      const words = lastUserEntry.text.split(/\s+/).filter(Boolean);
+      setPendingRetryOriginalAttempt({
+        transcriptText: lastUserEntry.text,
+        fillerCount: countFillers(lastUserEntry.text),
+        wordCount: words.length,
+        aiScores: latestAiScores,
+      });
+    }
     addRetryPrompt();
-  }, [addRetryPrompt]);
+  }, [addRetryPrompt, setPendingRetryOriginalAttempt]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [entries]);
+  }, [transcript]);
 
   return (
     <div className="flex flex-col h-full">
@@ -42,7 +52,7 @@ export default function TranscriptPanel() {
       </div>
 
       <div className="flex-1 overflow-y-auto space-y-4 pr-1 scrollbar-thin">
-        {entries.map((entry) => (
+        {transcript.map((entry) => (
           <div
             key={entry.id}
             className={`flex gap-3 ${entry.speaker === "user" ? "flex-row-reverse" : ""}`}
@@ -58,7 +68,7 @@ export default function TranscriptPanel() {
             </div>
             <div className="flex flex-col gap-2 max-w-[80%]">
               <div
-                className={`px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${
+                className={`px-4 py-2.5 rounded-2xl text-sm leading-relaxed whitespace-pre-line ${
                   entry.speaker === "ai"
                     ? "bg-white/5 text-white/80 rounded-tl-sm"
                     : "bg-indigo-500/15 text-white/90 rounded-tr-sm"
